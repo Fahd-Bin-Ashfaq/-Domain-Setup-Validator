@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Domain Setup Validator</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; color:#eaecef; background:#0e1116; }
+    h1 { margin: 0 0 16px; }
+    form { display:grid; gap:12px; max-width:720px; padding:16px; background:#151a21; border-radius:12px; }
+    input[type=text] { padding:10px; border-radius:8px; border:1px solid #2b3340; background:#0e1116; color:#eaecef; }
+    button { padding:10px 14px; border:0; border-radius:8px; background:#3b82f6; color:white; cursor:pointer; }
+    .card { padding:16px; background:#151a21; border-radius:12px; margin-top:18px; }
+    .ok { color:#22c55e; } .err { color:#ef4444; } .muted { color:#9aa4b2; }
+    code { background:#0e1116; padding:2px 6px; border-radius:6px; }
+    ul { margin: 6px 0 0 18px; }
+  </style>
+</head>
+<body>
+  <h1>Domain Setup Validator</h1>
+
+  <form method="post">
+    <label>Domain
+      <input type="text" name="domain" placeholder="example.com" required>
+    </label>
+    <label>Expected IP (optional)
+      <input type="text" name="expected_ip" placeholder="93.184.216.34">
+    </label>
+    <!-- <label>Expected CNAME (optional)
+      <input type="text" name="expected_cname" placeholder="www.example.com">
+    </label> -->
+    <button type="submit">Validate</button>
+  </form>
+
+  {% if data %}
+    {% if data.error %}
+      <div class="card err">{{ data.error }}</div>
+    {% else %}
+      <div class="card">
+        <h2>DNS checks for: <code>{{ data.domain }}</code></h2>
+        {% if data.dns.a_records or data.dns.cname %}
+          <div><b>A records:</b> {{ data.dns.a_records|join(", ") if data.dns.a_records else "(none)" }}</div>
+          <div><b>CNAME:</b> {{ data.dns.cname if data.dns.cname else "(none)" }}</div>
+        {% endif %}
+        <ul>
+          {% for n in data.dns.notes %}<li class="ok">{{ n }}</li>{% endfor %}
+          {% for e in data.dns.errors %}<li class="err">{{ e }}</li>{% endfor %}
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>HTTPS (curl) check</h2>
+        <div>Status: {{ data.https.status if data.https.status else "N/A" }}</div>
+        <ul>
+          {% for e in data.https.errors %}<li class="err">{{ e }}</li>{% endfor %}
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>TLS certificate (openssl) check</h2>
+        <div><b>notAfter:</b> {{ data.cert.not_after if data.cert.not_after else "N/A" }}</div>
+        <div><b>Days until expiry:</b> {{ data.cert.days_left if data.cert.days_left is not none else "N/A" }}</div>
+        <div><b>SAN/CN:</b> {{ data.cert.sans|join(", ") if data.cert.sans else "(none)" }}</div>
+        <div><b>Covers domain:</b> {{ "Yes" if data.cert.covers_domain else "No" }}</div>
+        <ul>
+          {% for e in data.cert.errors %}<li class="err">{{ e }}</li>{% endfor %}
+          {% for w in data.cert.warnings %}<li class="muted">{{ w }}</li>{% endfor %}
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Summary</h2>
+        {% if data.ok_all %}
+          <div class="ok">Setup Complete</div>
+        {% else %}
+          <div class="err">Setup NOT complete. Problems found:</div>
+          <ul>
+            {% if not data.dns.ok %}<li>- DNS checks failed</li>{% endif %}
+            {% if not data.https.ok %}<li>- HTTPS endpoint check failed</li>{% endif %}
+            {% if not data.cert.ok %}<li>- Certificate validation failed</li>{% endif %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endif %}
+</body>
+</html>
